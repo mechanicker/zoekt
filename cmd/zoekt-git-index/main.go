@@ -15,7 +15,10 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"flag"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -47,6 +50,7 @@ func run() int {
 	offlineRanking := flag.String("offline_ranking", "", "the name of the file that contains the ranking info.")
 	offlineRankingVersion := flag.String("offline_ranking_version", "", "a version string identifying the contents in offline_ranking.")
 	languageMap := flag.String("language_map", "", "a mapping between a language and its ctags processor (a:0,b:3).")
+	repoMap := flag.String("repo_map", "", "a JSON file/string containing repository absolute path to name mappings.")
 	flag.Parse()
 
 	// Tune GOMAXPROCS to match Linux container CPU quota.
@@ -83,6 +87,29 @@ func run() int {
 	}
 
 	gitRepos := map[string]string{}
+
+	// Remove repository name guess work by providing an explicit map
+	if *repoMap != "" {
+		var data []byte
+
+		if fh, err := os.Open(*repoMap); err == nil {
+			data, err = io.ReadAll(fh)
+			_ = fh.Close()
+			if err != nil {
+				log.Fatalf("error reading %s: %v", *repoMap, err)
+			}
+		} else {
+			var pathErr *os.PathError
+			if errors.As(err, &pathErr) && errors.Is(pathErr, os.ErrNotExist) {
+				data = []byte(*repoMap)
+			}
+		}
+
+		if err := json.Unmarshal(data, &gitRepos); err != nil {
+			log.Fatalf("error parsing %s: %v", *repoMap, err)
+		}
+	}
+
 	for _, repoDir := range flag.Args() {
 		repoDir, err := filepath.Abs(repoDir)
 		if err != nil {

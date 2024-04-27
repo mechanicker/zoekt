@@ -228,10 +228,12 @@ func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
 		desc.URL = webURLStr
 	}
 
-	name := sec.Options.Get("name")
-	if name != "" {
-		desc.Name = name
-	} else {
+	// Retain name provided in repository mapping input
+	if desc.Name == "" {
+		desc.Name = sec.Options.Get("name")
+	}
+
+	if desc.Name == "" {
 		remoteURL := configLookupRemoteURL(cfg, "origin")
 		if remoteURL == "" {
 			return nil
